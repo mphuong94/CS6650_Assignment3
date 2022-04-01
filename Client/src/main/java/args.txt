@@ -1,0 +1,23 @@
+# local
+--numThread 32 --numSkiers 20000 --numLifts 40 --numRuns 10 --url http://localhost:8080/ResortServer_war_exploded/skiers/ --part 1
+--numThread 64 --numSkiers 20000 --numLifts 40 --numRuns 10 --url http://localhost:8080/ResortServer_war_exploded/skiers/ --part 1
+--numThread 128 --numSkiers 20000 --numLifts 40 --numRuns 10 --url http://localhost:8080/ResortServer_war_exploded/skiers/ --part 1
+--numThread 256 --numSkiers 20000 --numLifts 40 --numRuns 10 --url http://localhost:8080/ResortServer_war_exploded/skiers/ --part 1
+--numThread 512 --numSkiers 20000 --numLifts 40 --numRuns 10 --url http://localhost:8080/ResortServer_war_exploded/skiers/ --part 1
+
+--numThread 32 --numSkiers 20000 --numLifts 40 --numRuns 10 --url http://localhost:8080/ResortServer_war_exploded/skiers/ --part 2
+--numThread 64 --numSkiers 20000 --numLifts 40 --numRuns 10 --url http://localhost:8080/ResortServer_war_exploded/skiers/ --part 2
+--numThread 128 --numSkiers 20000 --numLifts 40 --numRuns 10 --url http://localhost:8080/ResortServer_war_exploded/skiers/ --part 2
+--numThread 256 --numSkiers 20000 --numLifts 40 --numRuns 10 --url http://localhost:8080/ResortServer_war_exploded/skiers/ --part 2
+#EC2
+--numThread 32 --numSkiers 20000 --numLifts 40 --numRuns 10 --url http://LB-1463899760.us-west-2.elb.amazonaws.com:8080/ResortServer_war/skiers/ --part 1
+--numThread 64 --numSkiers 20000 --numLifts 40 --numRuns 10 --url http://LB-1463899760.us-west-2.elb.amazonaws.com:8080/ResortServer_war/skiers/ --part 1
+--numThread 128 --numSkiers 20000 --numLifts 40 --numRuns 10 --url http://LB-1463899760.us-west-2.elb.amazonaws.com:8080/ResortServer_war/skiers/ --part 1
+--numThread 256 --numSkiers 20000 --numLifts 40 --numRuns 10 --url http://LB-1463899760.us-west-2.elb.amazonaws.com:8080/ResortServer_war/skiers/ --part 1
+
+--numThread 32 --numSkiers 20000 --numLifts 40 --numRuns 10 --url http://LB-1463899760.us-west-2.elb.amazonaws.com:8080/ResortServer_war/skiers/ --part 2
+--numThread 64 --numSkiers 20000 --numLifts 40 --numRuns 10 --url http://LB-1463899760.us-west-2.elb.amazonaws.com:8080/ResortServer_war/skiers/ --part 2
+--numThread 128 --numSkiers 20000 --numLifts 40 --numRuns 10 --url http://LB-1463899760.us-west-2.elb.amazonaws.com:8080/ResortServer_war/skiers/ --part 2
+--numThread 256 --numSkiers 20000 --numLifts 40 --numRuns 10 --url http://LB-1463899760.us-west-2.elb.amazonaws.com:8080/ResortServer_war/skiers/ --part 2
+
+
