@@ -26,14 +26,14 @@ public class SkierServlet extends HttpServlet {
     public static ObjectPool<Channel> pool;
     public GsonBuilder builder;
     public Gson gson;
-    private static String QUEUE_NAME = "postRequest";
-    private static String EXCHANGE_NAME = "fanout";
+    private static String EXCHANGE_NAME = "postRequest";
     final static Logger logger = Logger.getLogger(SkierServlet.class.getName());
+    private static final String RABBIT_HOST = "34.219.103.201";
 
     @Override
     public void init() {
         factory = new ConnectionFactory();
-        factory.setHost("54.190.81.230");
+        factory.setHost(RABBIT_HOST);
         try {
             Connection newConn = factory.newConnection();
             GenericObjectPoolConfig<Channel> config = new GenericObjectPoolConfig<>();
@@ -100,10 +100,8 @@ public class SkierServlet extends HttpServlet {
             try {
                 Channel channel = pool.borrowObject();
                 String jsonString = gson.toJson(newInfo);
-                channel.exchangeDeclare(EXCHANGE_NAME, BuiltinExchangeType.FANOUT, true);
-                channel.queueDeclare(QUEUE_NAME, true, false, false, null);
-                channel.queueBind(QUEUE_NAME, EXCHANGE_NAME, "");
-                channel.basicPublish("", QUEUE_NAME, null, jsonString.getBytes("UTF-8"));
+                channel.exchangeDeclare(EXCHANGE_NAME, BuiltinExchangeType.FANOUT);
+                channel.basicPublish(EXCHANGE_NAME, "", null, jsonString.getBytes("UTF-8"));
                 pool.returnObject(channel);
                 response.setStatus(HttpServletResponse.SC_CREATED);
                 response.getWriter().write("It works post!");

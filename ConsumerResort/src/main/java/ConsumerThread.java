@@ -12,6 +12,7 @@ import util.LiftInfo;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -78,18 +79,20 @@ public class ConsumerThread implements Runnable {
             String skierId = receivedInfo.getSkierId().toString();
             String liftId = receivedInfo.getLiftId().toString();
             String minute = receivedInfo.getMinute().toString();
-            String waitTime = receivedInfo.getWaitTime().toString();
-            Integer vertical = (receivedInfo.getLiftId()*10);
-            String strVertical = vertical.toString();
-            Long dateTime = System.currentTimeMillis();
-            String strDateTime = dateTime.toString();
+            LocalDate currentDate = LocalDate.now();
+            String day = String.valueOf(currentDate.getDayOfMonth());
+            String month = currentDate.getMonth().toString();
+            String year = String.valueOf(currentDate.getYear());
+            StringBuilder dateString = new StringBuilder();
+            dateString.append(year);
+            dateString.append(month);
+            dateString.append(day);
+
 
             // add all info
-            updateIfExists(jedis,skierId,"liftId",liftId);
-            updateIfExists(jedis,skierId,"minute",minute);
-            updateIfExists(jedis,skierId,"waitTime",waitTime);
-            updateIfExists(jedis,skierId,"vertical",strVertical);
-            updateIfExists(jedis,skierId,"dateTime",strDateTime);
+            updateIfExists(dateString.toString(),jedis,skierId);
+            updateIfExists(dateString.toString(),jedis,liftId);
+            updateIfExists(dateString.toString(),jedis,minute);
 
         } catch (JedisException e) {
             // return to pool if needed
@@ -104,19 +107,11 @@ public class ConsumerThread implements Runnable {
         }
     }
 
-    void updateIfExists(Jedis jedis, String skierId, String fieldName, String value){
-        if (jedis.hexists(skierId,fieldName)){
-            Map<String, String> fields = jedis.hgetAll(skierId);
-            String currentValue = fields.get(fieldName);
-            StringBuilder newValue = new StringBuilder();
-            newValue.append(currentValue);
-            newValue.append(" , ");
-            newValue.append(value);
-            jedis.hset(skierId, fieldName, newValue.toString());
-            String output = jedis.hget(skierId, fieldName);
-            System.out.println(output);
+    void updateIfExists(String day, Jedis jedis, String value){
+        if (jedis.exists(value)){
+            jedis.zincrby(day,1.0,value);
         } else {
-            jedis.hset(skierId, fieldName, value);
+            jedis.zadd(day,1,value);
         }
     }
 
