@@ -7,26 +7,25 @@ import org.apache.commons.lang3.concurrent.CircuitBreaker;
 import org.apache.commons.lang3.concurrent.EventCountCircuitBreaker;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
+import redis.clients.jedis.Pipeline;
 import redis.clients.jedis.exceptions.JedisException;
 import util.LiftInfo;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 public class ConsumerThread implements Runnable {
-    private static final String EXCHANGE_NAME = "postRequest";
+    private static final String QUEUE_NAME = "skier";
     private final Connection connection;
     public JedisPool pool;
     public EventCountCircuitBreaker breaker;
     private final GsonBuilder builder;
     private final Gson gson;
 
-    public ConsumerThread(JedisPool pool, Connection connection, EventCountCircuitBreaker breaker) {
+    public ConsumerThread(JedisPool pool, Connection connection) {
         this.pool = pool;
         this.connection = connection;
-        this.breaker = breaker;
         this.builder = new GsonBuilder();
         builder.setPrettyPrinting();
         this.gson = builder.create();
@@ -35,39 +34,28 @@ public class ConsumerThread implements Runnable {
     @Override
     public void run() {
         Channel channel = null;
-        if (breaker.checkState()) {
-            try {
-                channel = connection.createChannel();
-                channel.exchangeDeclare(EXCHANGE_NAME, "fanout");
-                String queueName = channel.queueDeclare().getQueue();
-                channel.queueBind(queueName, EXCHANGE_NAME, "");
-                System.out.println(" [*] Waiting for messages. To exit press CTRL+C");
-                channel.basicQos(10); // accept only one unack-ed message at a time
-                Channel finalChannel = channel;
-                DeliverCallback deliverCallback = (consumerTag, delivery) -> {
-                    String message = new String(delivery.getBody(), StandardCharsets.UTF_8);
-                    System.out.println(" [x] Received '" + message + "'");
-                    try {
-                        processMessage(message);
-                    } finally {
-                        System.out.println(" [x] Done");
-                        finalChannel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
-                    }
-                };
-                boolean autoAck = false;
-                channel.basicConsume(queueName, autoAck, deliverCallback, consumerTag -> {
-                });
-            } catch (IOException e) {
-                breaker.incrementAndCheckState();
-            }
-        } else {
-            try {
-                Thread.sleep(10);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
+        try {
+            channel = connection.createChannel();
+            channel.queueDeclare(QUEUE_NAME, false, false, false, null);
+            channel.basicQos(1);
+            System.out.println(" [*] Waiting for messages. To exit press CTRL+C");
+            Channel finalChannel = channel;
+            DeliverCallback deliverCallback = (consumerTag, delivery) -> {
+                String message = new String(delivery.getBody(), StandardCharsets.UTF_8);
+                System.out.println(" [x] Received '" + message + "'");
+                try {
+                    processMessage(message);
+                } finally {
+                    System.out.println(" [x] Done");
+                    finalChannel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
+                }
+            };
+            boolean autoAck = false;
+            channel.basicConsume(QUEUE_NAME, autoAck, deliverCallback, consumerTag -> {
+            });
+        } catch (IOException e) {
+            e.printStackTrace();
         }
-
     }
 
     void processMessage(String message) {
@@ -85,11 +73,20 @@ public class ConsumerThread implements Runnable {
             String strDateTime = dateTime.toString();
 
             // add all info
-            updateIfExists(jedis,skierId,"liftId",liftId);
-            updateIfExists(jedis,skierId,"minute",minute);
-            updateIfExists(jedis,skierId,"waitTime",waitTime);
-            updateIfExists(jedis,skierId,"vertical",strVertical);
-            updateIfExists(jedis,skierId,"dateTime",strDateTime);
+            StringBuilder output = new StringBuilder();
+            String liftIdInfo = concatInfo("liftId",liftId);
+            String minuteInfo = concatInfo("minute",minute);
+            String waitTimeInfo = concatInfo("waitTime",waitTime);
+            String verticalInfo = concatInfo("vertical",strVertical);
+            String dataTimeInfo = concatInfo("dateTime",strDateTime);
+            output.append("/");
+            output.append(liftIdInfo);
+            output.append(minuteInfo);
+            output.append(waitTimeInfo);
+            output.append(verticalInfo);
+            output.append(dataTimeInfo);
+            output.append("/");
+            jedis.append(skierId,output.toString());
 
         } catch (JedisException e) {
             // return to pool if needed
@@ -103,21 +100,14 @@ public class ConsumerThread implements Runnable {
                 pool.returnResource(jedis);
         }
     }
-
-    void updateIfExists(Jedis jedis, String skierId, String fieldName, String value){
-        if (jedis.hexists(skierId,fieldName)){
-            Map<String, String> fields = jedis.hgetAll(skierId);
-            String currentValue = fields.get(fieldName);
-            StringBuilder newValue = new StringBuilder();
-            newValue.append(currentValue);
-            newValue.append(" , ");
-            newValue.append(value);
-            jedis.hset(skierId, fieldName, newValue.toString());
-            String output = jedis.hget(skierId, fieldName);
-            System.out.println(output);
-        } else {
-            jedis.hset(skierId, fieldName, value);
-        }
+    String concatInfo(String fieldName,String skierInfo){
+        StringBuilder newValue = new StringBuilder();
+        newValue.append(" ");
+        newValue.append(fieldName);
+        newValue.append(":");
+        newValue.append(skierInfo);
+        newValue.append(",");
+        return newValue.toString();
     }
 
 }

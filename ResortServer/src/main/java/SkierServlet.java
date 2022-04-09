@@ -15,6 +15,7 @@ import javax.servlet.http.*;
 import javax.servlet.annotation.*;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
 import java.util.logging.Level;
@@ -26,24 +27,31 @@ public class SkierServlet extends HttpServlet {
     public static ObjectPool<Channel> pool;
     public GsonBuilder builder;
     public Gson gson;
-    private static String EXCHANGE_NAME = "postRequest";
+    private static String QUEUE_NAME_SKIER = "skier";
+    private static String QUEUE_NAME_RESORT = "resort";
     final static Logger logger = Logger.getLogger(SkierServlet.class.getName());
-    private static final String RABBIT_HOST = "34.219.103.201";
+    private static final String RABBIT_HOST = "35.88.199.92";
+    private static final String userName = "guest1";
+    private static final String password = "guest1";
 
     @Override
     public void init() {
         factory = new ConnectionFactory();
         factory.setHost(RABBIT_HOST);
+        factory.setUsername(userName);
+        factory.setPassword(password);
         try {
             Connection newConn = factory.newConnection();
             GenericObjectPoolConfig<Channel> config = new GenericObjectPoolConfig<>();
-            config.setMaxTotal(200);
+            config.setMaxTotal(500);
             config.setMinIdle(100);
             config.setMaxIdle(200);
             pool = new GenericObjectPool<>(new ChannelFactory(newConn), config);
         } catch (IOException e) {
             e.printStackTrace();
         } catch (TimeoutException e) {
+            e.printStackTrace();
+        } catch (Exception e) {
             e.printStackTrace();
         }
 
@@ -100,8 +108,10 @@ public class SkierServlet extends HttpServlet {
             try {
                 Channel channel = pool.borrowObject();
                 String jsonString = gson.toJson(newInfo);
-                channel.exchangeDeclare(EXCHANGE_NAME, BuiltinExchangeType.FANOUT);
-                channel.basicPublish(EXCHANGE_NAME, "", null, jsonString.getBytes("UTF-8"));
+                channel.queueDeclare(QUEUE_NAME_SKIER, false, false, false, null);
+                channel.queueDeclare(QUEUE_NAME_RESORT, false, false, false, null);
+                channel.basicPublish("", QUEUE_NAME_SKIER, null, jsonString.getBytes("UTF-8"));
+                channel.basicPublish("", QUEUE_NAME_RESORT, null, jsonString.getBytes("UTF-8"));
                 pool.returnObject(channel);
                 response.setStatus(HttpServletResponse.SC_CREATED);
                 response.getWriter().write("It works post!");

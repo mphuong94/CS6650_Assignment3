@@ -8,14 +8,13 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 public class Main {
-    private static final String rabbitHost = "34.219.103.201";
-    private static final String userName = "guest";
-    private static final String password = "guest";
-    private static final String redisHost = "54.149.88.106";
+    private static final String rabbitHost = "35.88.199.92";
+    private static final String userName = "guest1";
+    private static final String password = "guest1";
+    private static final String redisHost = "34.219.14.13";
     private static final Integer redisPort = 6379;
     private static JedisPool pool = null;
     static int numThread = 32;
-    private static EventCountCircuitBreaker breaker = new EventCountCircuitBreaker(1000, 1, TimeUnit.MINUTES, 800);
 
     public static void main(String[] args) {
         ConnectionFactory factory = new ConnectionFactory();
@@ -48,7 +47,7 @@ public class Main {
             Connection newConnection = factory.newConnection();
             ConsumerThread[] consumers = new ConsumerThread[numThread];
             for (int i = 0; i < numThread; i++) {
-                consumers[i] = new ConsumerThread(pool, newConnection, breaker);
+                consumers[i] = new ConsumerThread(pool, newConnection);
             }
 
             Thread[] threads = new Thread[numThread];

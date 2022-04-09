@@ -1,6 +1,7 @@
 package utils;
 
 import org.apache.commons.httpclient.HttpStatus;
+import org.apache.commons.lang3.concurrent.EventCountCircuitBreaker;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
@@ -10,6 +11,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -38,6 +40,7 @@ public class SkierPhase implements Runnable {
     private final List<LatencyStat> history = Collections.synchronizedList(new ArrayList<>());
     CloseableHttpClient client;
     private ClientPartEnum partChosen;
+    private static EventCountCircuitBreaker breaker = new EventCountCircuitBreaker(1000, 1, TimeUnit.SECONDS, 800);
 
     public SkierPhase(Integer numThreads, Integer numSkiers, Integer numLifts, Integer numRuns, Integer range, Integer numRequestToSend, Integer startTime, Integer endTime, String url, ClientPartEnum partChosen) {
         this.numThreads = numThreads;
@@ -92,7 +95,7 @@ public class SkierPhase implements Runnable {
     public void run() {
         System.out.println("Number of calls being made: " + this.getTotalCalls());
         for (int i = 0; i < this.numThreads; i++) {
-            int rangeChunk = (int) Math.ceil(this.numSkiers/this.range);
+            int rangeChunk = (int) Math.ceil(this.numSkiers / this.range);
             int startRange = i * rangeChunk;
             int skierID = random.nextInt(rangeChunk) + startRange + 1;
             int liftID = Math.abs(random.nextInt(this.numLifts));
@@ -102,27 +105,30 @@ public class SkierPhase implements Runnable {
             Runnable thread = () -> {
                 // send a number of POST request
                 for (int j = 0; j < this.numRequestToSend; j++) {
-                    try {
-                        PostConnection newPost = new PostConnection(client, url, skierID, liftID, time, waitTime);
-                        LatencyStat result = newPost.makeConnection(this.partChosen);
-                        if (result.getResponseCode() == HttpStatus.SC_CREATED) {
-                            this.incrementSuccess();
-                        } else {
-                            System.out.println("FAILURE");
+                    if (breaker.checkState()) {
+                        try {
+                            PostConnection newPost = new PostConnection(client, url, skierID, liftID, time, waitTime);
+                            LatencyStat result = newPost.makeConnection(this.partChosen);
+                            if (result.getResponseCode() == HttpStatus.SC_CREATED) {
+                                this.incrementSuccess();
+                            } else {
+                                System.out.println("FAILURE");
+                                breaker.incrementAndCheckState();
+                            }
+
+                            if (this.partChosen == ClientPartEnum.PART2) {
+                                this.history.add(result);
+                            }
+
+                            this.isComplete.countDown();
+
+                        } catch (Exception e) {
+                            e.printStackTrace();
                         }
-
-
-                        if (this.partChosen == ClientPartEnum.PART2) {
-                            this.history.add(result);
-                        }
-
-                        this.isComplete.countDown();
-
-                    } catch (Exception e) {
-                        e.printStackTrace();
+                        this.startNext.countDown();
                     }
+
                 }
-                this.startNext.countDown();
             };
             new Thread(thread).start();
         }
